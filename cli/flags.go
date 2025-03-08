@@ -279,6 +279,25 @@ var ioFlags = []cli.Flag{
 		Name:  "lookup",
 		Usage: "Force requests to be 'host' for host-style or 'path' for path-style lookup. Default will attempt autodetect based on remote host name.",
 	},
+	cli.StringFlag{
+		Name:  "proxy-host",
+		Value: "",
+		Usage: "Proxy host to which the request is sent --proxy-host=http://10.12.11.0:8080",
+	},
+	cli.StringSliceFlag{
+		Name:   "add-metadata",
+		Usage:  "Add user metadata to all objects using the format <key>=<value>. Random value can be set with 'rand:%length'. Can be used multiple times. Example: --add-metadata foo=bar --add-metadata randomValue=rand:1024.",
+		Hidden: true,
+	},
+	cli.StringSliceFlag{
+		Name:   "tag",
+		Usage:  "Add user tag to all objects using the format <key>=<value>. Random value can be set with 'rand:%length'. Can be used multiple times. Example: --tag foo=bar --tag randomValue=rand:1024.",
+		Hidden: true,
+	},
+	cli.StringSliceFlag{
+		Name:   "http-header",
+		Usage:  "Add customer http headers to all request using the format <name>=<value>.",
+	},
 }
 
 func getCommon(ctx *cli.Context, src func() generator.Source) bench.Common {

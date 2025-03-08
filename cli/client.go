@@ -27,6 +27,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -183,7 +184,52 @@ func getClient(ctx *cli.Context, host string) (*minio.Client, error) {
 	return cl, nil
 }
 
+type CustomTransport struct {
+	Transport http.RoundTripper
+	Headers   map[string]string
+	Url *url.URL
+}
+
+func (c *CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Add custom headers to the request
+	for key, value := range c.Headers {
+		req.Header.Add(key, value)
+	}
+
+	if c.Url != nil {
+		req.URL.Host = c.Url.Host
+		req.URL.Scheme = c.Url.Scheme
+		req.Host = c.Url.Host
+	}
+
+	// Proceed with the original request using the custom headers
+	return c.Transport.RoundTrip(req)
+}
+
+func getAdditionalHttpHeaders(ctx *cli.Context) map[string]string {
+	headers := make(map[string]string)
+	for _, flag := range []string{"http-header"} {
+		for _, v := range ctx.StringSlice(flag) {
+			idx := strings.Index(v, "=")
+			if idx <= 0 {
+				console.Fatalf("--%s takes `key=value` argument", flag)
+			}
+			key := v[:idx]
+			value := v[idx+1:]
+			if len(value) == 0 {
+				console.Fatal("--%s value can't be empty", flag)
+			}
+			headers[key] = value
+		}
+	}
+
+	return headers
+}
+
 func clientTransport(ctx *cli.Context) http.RoundTripper {
+
+	headers := getAdditionalHttpHeaders(ctx)
+
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -224,7 +270,21 @@ func clientTransport(ctx *cli.Context) http.RoundTripper {
 			http2.ConfigureTransport(tr)
 		}
 	}
-	return tr
+
+	ctr := 	&CustomTransport{
+			Transport : tr,
+			Headers : headers}  // Inject custom headers here
+
+	host_url := ctx.String("proxy-host")
+	if host_url != "" {
+		u, err := url.Parse(host_url)
+		if err != nil {
+			fatalIf(probe.NewError(err), "Unable to parse proxy host URL")
+		}
+		ctr.Url = u
+	}
+
+	return ctr
 }
 
 // parseHosts will parse the host parameter given.
